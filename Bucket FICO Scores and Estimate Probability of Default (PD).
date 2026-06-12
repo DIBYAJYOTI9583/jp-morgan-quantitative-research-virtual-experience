@@ -1,0 +1,96 @@
+import pandas as pd
+import numpy as np
+
+# =====================================================
+# J.P. Morgan Forage - Task 4
+# FICO Score Bucketing & Probability of Default Mapping
+# =====================================================
+
+DATA_FILE = "Customer_Loan_Data.csv"
+
+# Load data
+df = pd.read_csv(DATA_FILE)
+
+# Keep only required columns
+fico = df["fico_score"]
+default = df["default"]
+
+# -----------------------------------------------------
+# Create FICO Buckets using Quantiles
+# -----------------------------------------------------
+NUM_BUCKETS = 10
+
+df["fico_bucket"] = pd.qcut(
+    df["fico_score"],
+    q=NUM_BUCKETS,
+    duplicates="drop"
+)
+
+# Calculate Probability of Default (PD) per bucket
+bucket_summary = (
+    df.groupby("fico_bucket")
+      .agg(
+          borrowers=("default", "count"),
+          defaults=("default", "sum"),
+          pd=("default", "mean")
+      )
+      .reset_index()
+)
+
+print("\nBucket Summary")
+print(bucket_summary)
+
+# -----------------------------------------------------
+# Rating Map
+# Lower rating = Better credit score
+# -----------------------------------------------------
+
+bucket_summary = bucket_summary.sort_values(
+    "pd",
+    ascending=True
+).reset_index(drop=True)
+
+bucket_summary["rating"] = range(
+    1,
+    len(bucket_summary) + 1
+)
+
+print("\nRating Map")
+print(bucket_summary[["fico_bucket", "rating", "pd"]])
+
+# -----------------------------------------------------
+# Prediction Function
+# -----------------------------------------------------
+
+def predict_pd(fico_score):
+    """
+    Returns PD and Rating for a FICO score.
+    """
+
+    for _, row in bucket_summary.iterrows():
+        interval = row["fico_bucket"]
+
+        if fico_score in interval:
+            return {
+                "rating": int(row["rating"]),
+                "probability_of_default": float(
+                    round(row["pd"], 4)
+                )
+            }
+
+    return None
+
+
+# -----------------------------------------------------
+# Example
+# -----------------------------------------------------
+if __name__ == "__main__":
+
+    example_score = 700
+
+    result = predict_pd(example_score)
+
+    print("\nExample")
+    print("FICO Score:", example_score)
+    print("Rating:", result["rating"])
+    print("PD:", result["probability_of_default"])
