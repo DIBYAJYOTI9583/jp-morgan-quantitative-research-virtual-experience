@@ -1,0 +1,116 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, roc_auc_score
+
+# Load dataset
+df = pd.read_csv("Task3_Loan_Data.csv")
+
+# Features and target
+X = df[
+    [
+        "credit_lines_outstanding",
+        "loan_amt_outstanding",
+        "total_debt_outstanding",
+        "income",
+        "years_employed",
+        "fico_score",
+    ]
+]
+
+y = df["default"]
+
+# Train/Test Split
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42
+)
+
+# Train Logistic Regression Model
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train, y_train)
+
+# Evaluate Model
+predictions = model.predict(X_test)
+probabilities = model.predict_proba(X_test)[:, 1]
+
+print("Accuracy:", accuracy_score(y_test, predictions))
+print("ROC-AUC:", roc_auc_score(y_test, probabilities))
+
+# ----------------------------------------------------
+# Probability of Default Function
+# ----------------------------------------------------
+
+def predict_default_probability(
+        credit_lines_outstanding,
+        loan_amt_outstanding,
+        total_debt_outstanding,
+        income,
+        years_employed,
+        fico_score):
+
+    borrower = pd.DataFrame({
+        "credit_lines_outstanding": [credit_lines_outstanding],
+        "loan_amt_outstanding": [loan_amt_outstanding],
+        "total_debt_outstanding": [total_debt_outstanding],
+        "income": [income],
+        "years_employed": [years_employed],
+        "fico_score": [fico_score]
+    })
+
+    pd_estimate = model.predict_proba(borrower)[0][1]
+
+    return pd_estimate
+
+
+# ----------------------------------------------------
+# Expected Loss Function
+# ----------------------------------------------------
+
+def calculate_expected_loss(
+        credit_lines_outstanding,
+        loan_amt_outstanding,
+        total_debt_outstanding,
+        income,
+        years_employed,
+        fico_score,
+        recovery_rate=0.10):
+
+    pd_estimate = predict_default_probability(
+        credit_lines_outstanding,
+        loan_amt_outstanding,
+        total_debt_outstanding,
+        income,
+        years_employed,
+        fico_score
+    )
+
+    exposure_at_default = loan_amt_outstanding
+
+    loss_given_default = 1 - recovery_rate
+
+    expected_loss = (
+        pd_estimate
+        * exposure_at_default
+        * loss_given_default
+    )
+
+    return expected_loss
+
+
+# ----------------------------------------------------
+# Example Test Case
+# ----------------------------------------------------
+
+expected_loss = calculate_expected_loss(
+    credit_lines_outstanding=2,
+    loan_amt_outstanding=15000,
+    total_debt_outstanding=30000,
+    income=60000,
+    years_employed=5,
+    fico_score=700
+)
+
+print("\nExpected Loss: $", round(expected_loss, 2))
